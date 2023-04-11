@@ -12,7 +12,9 @@ import json
 import zipfile
 import shutil
 from requests.auth import HTTPBasicAuth
-from pickle import TRUE
+from pickle import TRUE 
+
+# 
 
 def download_xnat_data(username, password, session_labels, overwrite, output_dir, project_id):
     # Authenticate with XNAT using username and password

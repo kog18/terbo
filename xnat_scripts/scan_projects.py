@@ -9,8 +9,8 @@ from pyxnat import Interface
 
 nurips = Interface(
                server='https://nuripsweb01.fsm.northwestern.edu',
-               user='ako275',
-               password='z7!QLcYfo6Wh')
+               user='',
+               password='')
 
 project_list=('TERBO_Baylor','TERBO_Lurie','TERBO_Maiami','TERBO_Bronx','TERBO_Colorado','TERBO_StJude','TERBO_UCSD')
 

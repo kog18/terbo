@@ -13,8 +13,83 @@ import zipfile
 import shutil
 import sys
 from requests.auth import HTTPBasicAuth
+import configparser
+import psycopg2
 #from pickle import TRUE 
 
+""" 
+Command line example:
+
+python download_terbo_data.py -f https://nuripsweb01.fsm.northwestern.edu -u ako275 -i TERBO_Lurie -s 400817K,401215D,7056167F,7060217L -d /disk/fsmres_users/ako275/PBS/NIACAL/home/ako275/terbo
+ To do: check db connection, insert & select queries
+ 
+"""
+def send_email(sender, recipient, subject, body):
+    """Sends an email using the Linux mail command.
+
+    Args:
+        sender (str): The sender's email address.
+        recipient (str): The recipient's email address.
+        subject (str): The email subject.
+        body (str): The email body.
+    """
+
+    # Create the mail command.
+    command = "mail -s {subject} {recipient} < {body}".format(
+        subject=subject,
+        recipient=recipient,
+        body=body
+    )
+
+    # Run the mail command.
+    os.system(command)
+    
+def get_db_connection():
+    # Read the configuration file
+    config = configparser.ConfigParser()
+    config.read("database.ini")
+    
+    # Get the connection information from the configuration file
+    host = config["postgresql"]["host"]
+    port = config["postgresql"]["port"]
+    database = config["postgresql"]["database"]
+    username = config["postgresql"]["username"]
+    password = config["postgresql"]["password"]
+    
+    # Create a connection to the PostgreSQL database
+    connection = psycopg2.connect(host=host, port=port, database=database, user=username, password=password)
+    
+    return connection
+
+def run_query(connection, query):
+    """Runs a query and returns the results.
+
+    Args:
+        connection (psycopg2.Connection): A connection to the PostgreSQL database.
+        query (str): The SQL query to run.
+
+    Returns:
+        list: The results of the query.
+    """
+
+    # Create a cursor.
+    cursor = connection.cursor()
+
+    # Execute the query.
+    cursor.execute(query)
+    connection.commit()
+    
+    # Fetch the results.
+    if cursor.pgresult_ptr is not None:
+        results = cursor.fetchall()
+    else:
+        results = 'No results returned'    
+
+    # Close the cursor.
+    cursor.close()
+
+    return results
+ 
 # Changing the downloaded file structure to combine scan ID with scan type for folder names and create DICOM and BIDS folders
 def rename_folders(root_path):
     for folder1 in os.listdir(root_path):
@@ -123,6 +198,50 @@ def create_metadata(auth, api_path, output_dir, level, session_label):
         print(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
         
     
+def download_resources(host, auth, session_id, output_dir):
+    resources_path=f"{host}/data/archive/experiments/{session_id}/resources?format=csv&columns=label"
+    response = requests.get(resources_path, auth=auth)
+    if response.status_code == 200:
+        decoded_content = response.content.decode('utf-8')
+        csv_reader = csv.reader(decoded_content.splitlines(), delimiter=',')
+        list_of_rows = list(csv_reader)
+        
+        # Remove the header
+        list_of_rows.pop(0)
+        print(list_of_rows)
+        for row in list_of_rows:
+            if row[1] and row[6]:
+                resource_type=row[1]
+                files_number=row[6]
+                resource_url = f"{host}/data/archive/experiments/{session_id}/resources/{resource_type}/files?format=zip&structure=legacy"
+                #print(scan_url)
+                response = requests.get(resource_url, auth=auth, stream=True)
+
+                resource_dir = os.path.join(output_dir,"resources")
+                resource_type_dir = os.path.join(resource_dir, resource_type)
+                os.makedirs(resource_dir, exist_ok=True)
+                os.makedirs(resource_type_dir, exist_ok=True)
+                    
+                # Save the resource data to a file
+                output_filename = f"{session_id}_{resource_type}.zip"
+                output_path = os.path.join(resource_type_dir, output_filename)
+                with open(output_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=1024):
+                        f.write(chunk)
+                
+                print ("Resource download completed. Extracting...")
+                
+                # Extract data without the directory structure (files only), remove the zip file
+                with zipfile.ZipFile(output_path) as file:
+                    for zip_info in file.infolist():
+                        zip_info.filename = zip_info.filename.split("/")[-1]
+                        file.extract(zip_info, resource_type_dir)
+
+                os.remove(output_path)                
+        else:
+            print('Associated resources not found.')
+    else:
+        print(f"Failed to resource info. Status code: {response.status_code}")
     
 def download_xnat_data(host, username, password, session_labels, overwrite, output_dir, project_id):
     # Authenticate with XNAT using username and password
@@ -144,9 +263,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
             list_of_rows = list(csv_reader)
             #json_data = json.dumps(list_of_rows) 
             list_of_rows.pop(0)
-                          
-            
-            
+                                   
             # Loop through each list of sessions
             for record in list_of_rows:
                 proceed=True
@@ -155,9 +272,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                 if session_label == session_label_xnat:
                     # Extract the session id and date from the session data
                     session_id = record[3]
-                    session_date = record[5].replace('-', '')
-                    
-                    
+                    session_date = record[5].replace('-', '')                 
                     group = get_subject_group(host,auth,session_id)
 
                     # Determine the output directory based on the session label
@@ -178,6 +293,9 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                     #     print(f"Invalid session label: {session_label}")
                     #     continue
     
+                    if os.path.exists(os.path.join(output_dir, 'YT', 'DICOM', f'YT-{session_label}-{session_date}')):
+                        print(f'Session directory already exists. Assuming data downloaded previously.')
+                        proceed=False                     
                     # Create the output directory if it doesn't exist
                     try:
                         os.makedirs(output_directory, exist_ok=False)
@@ -228,7 +346,14 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         scan_api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note'
                         #create_metadata(auth, session_api_path, output_directory, "session", session_label)         
                         create_metadata(auth, scan_api_path, output_directory, "scan", session_label)
-                         
+                        download_resources(host, auth, session_id, output_directory)
+                        
+                        connection = get_db_connection()
+                        result = run_query(connection, f"INSERT INTO studies(study_label, study_xnat_id, study_xnat_project_id, create_date, first_dw_date, last_dw_date) VALUES ('{session_label}','{session_id}','{project_id}',NOW(),NOW(),NOW());")
+                        print(f"Insert result: {result}")
+                        result = run_query(connection, "SELECT * FROM studies;") 
+                        print(f"Select result: {result}")
+                        
                         print(f"Finished downloading {session_label}.\n")
         else:
             print(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")

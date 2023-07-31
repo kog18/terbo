@@ -94,62 +94,65 @@ def run_query(connection, query):
 def rename_folders(root_path):
     for folder1 in os.listdir(root_path):
         for folder2 in os.listdir(os.path.join(root_path, folder1)):
-            scans_folder = os.path.join(root_path, folder1, folder2, "SCANS")
-            if os.path.isdir(scans_folder):
-                metadata_folder = os.path.join(root_path, folder1, folder2, "metadata")
-                if os.path.isdir(metadata_folder):
-                    csv_path = os.path.join(metadata_folder, "scan_metadata.csv")
-                    if os.path.isfile(csv_path):
-                        with open(csv_path) as csv_file:
-                            csv_reader = csv.DictReader(csv_file, skipinitialspace=True)
-                            for row in csv_reader:
-                                old_name = row["ID"].strip()
-                                new_name = f"{row['ID'].strip()}_{row['type'].strip()}"
-                                if os.path.isdir(os.path.join(scans_folder, old_name)):
-                                    os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
-                                    print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
-                                else:
-                                    print(f"Could not find directory {os.path.join(scans_folder, old_name)}")
+            if folder2 == 'DICOM':
+                dicom_folder = os.path.join(root_path, folder1, folder2)
+                for folder_session in os.listdir(dicom_folder):
+                    scans_folder = os.path.join(root_path, folder1, folder2, folder_session, "SCANS")
+                    if os.path.isdir(scans_folder):
+                        metadata_folder = os.path.join(root_path, folder1, folder2, folder_session, "metadata")
+                        if os.path.isdir(metadata_folder):
+                            csv_path = os.path.join(metadata_folder, "scan_metadata.csv")
+                            if os.path.isfile(csv_path):
+                                with open(csv_path) as csv_file:
+                                    csv_reader = csv.DictReader(csv_file, skipinitialspace=True)
+                                    for row in csv_reader:
+                                        old_name = row["ID"].strip()
+                                        new_name = f"{row['ID'].strip()}_{row['type'].strip()}"
+                                        if os.path.isdir(os.path.join(scans_folder, old_name)):
+                                            os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
+                                            print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
+                                        else:
+                                            print(f"Could not find directory {os.path.join(scans_folder, old_name)}")
+                            else:
+                                print(f"Could not find scan_metadata.csv in {metadata_folder}")
+                        else:
+                            print(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
                     else:
-                        print(f"Could not find scan_metadata.csv in {metadata_folder}")
-                else:
-                    print(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder2)}")
-            else:
-                print(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder2)}")
+                        print(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
+        
+    # # Move YA content to YA/DICOM
+    # ya_folder = os.path.join(root_path, "YA")
+    # if os.path.isdir(ya_folder):
+    #     dicom_folder = os.path.join(ya_folder, "DICOM")
+    #     if not os.path.isdir(dicom_folder):
+    #         os.mkdir(dicom_folder)
+    #     for item in os.listdir(ya_folder):
+    #         if item != "DICOM":
+    #             src = os.path.join(ya_folder, item)
+    #             dst = os.path.join(dicom_folder, item)
+    #             os.rename(src, dst)
     
-    # Move YA content to YA/DICOM
-    ya_folder = os.path.join(root_path, "YA")
-    if os.path.isdir(ya_folder):
-        dicom_folder = os.path.join(ya_folder, "DICOM")
-        if not os.path.isdir(dicom_folder):
-            os.mkdir(dicom_folder)
-        for item in os.listdir(ya_folder):
-            if item != "DICOM":
-                src = os.path.join(ya_folder, item)
-                dst = os.path.join(dicom_folder, item)
-                os.rename(src, dst)
+        # # Add BIDS folder to YA
+        # bids_folder = os.path.join(ya_folder, "BIDS")
+        # if not os.path.isdir(bids_folder):
+        #     os.mkdir(bids_folder)
     
-        # Add BIDS folder to YA
-        bids_folder = os.path.join(ya_folder, "BIDS")
-        if not os.path.isdir(bids_folder):
-            os.mkdir(bids_folder)
+    # # Move YT content to YT/DICOM
+    # yt_folder = os.path.join(root_path, "YT")
+    # if os.path.isdir(yt_folder):
+    #     dicom_folder = os.path.join(yt_folder, "DICOM")
+    #     if not os.path.isdir(dicom_folder):
+    #         os.mkdir(dicom_folder)
+    #     for item in os.listdir(yt_folder):
+    #         if item != "DICOM":
+    #             src = os.path.join(yt_folder, item)
+    #             dst = os.path.join(dicom_folder, item)
+    #             os.rename(src, dst)
     
-    # Move YT content to YT/DICOM
-    yt_folder = os.path.join(root_path, "YT")
-    if os.path.isdir(yt_folder):
-        dicom_folder = os.path.join(yt_folder, "DICOM")
-        if not os.path.isdir(dicom_folder):
-            os.mkdir(dicom_folder)
-        for item in os.listdir(yt_folder):
-            if item != "DICOM":
-                src = os.path.join(yt_folder, item)
-                dst = os.path.join(dicom_folder, item)
-                os.rename(src, dst)
-    
-        # Add BIDS folder to YT
-        bids_folder = os.path.join(yt_folder, "BIDS")
-        if not os.path.isdir(bids_folder):
-            os.mkdir(bids_folder)
+        # # Add BIDS folder to YT
+        # bids_folder = os.path.join(yt_folder, "BIDS")
+        # if not os.path.isdir(bids_folder):
+        #     os.mkdir(bids_folder)
 
 def get_subject_group(host, auth, session_id):
     
@@ -277,13 +280,20 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
 
                     # Determine the output directory based on the session label
                     if group == "YT":
-                        output_directory = os.path.join(output_dir, 'YT', f'YT-{session_label}-{session_date}')
+                        output_directory = os.path.join(output_dir, 'YT', 'DICOM', f'YT-{session_label}-{session_date}') 
                     elif group == "YA":
-                        output_directory = os.path.join(output_dir, 'YA', f'YA-{session_label}-{session_date}')
+                        output_directory = os.path.join(output_dir, 'YA', 'DICOM', f'YA-{session_label}-{session_date}')   
                     else:
                         print(f"Invalid group: {group}. Session: {session_label}")
                         continue
-                                        
+                     
+                     
+                    if os.path.exists(output_directory):
+                        print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
+                        proceed=False
+                    else:
+                        os.makedirs(output_directory)                    
+
                     # # Determine the output directory based on the session label
                     # if session_label.startswith('7'):
                     #     output_directory = os.path.join(output_dir, 'YT', f'YT-{session_label}-{session_date}')
@@ -293,15 +303,19 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                     #     print(f"Invalid session label: {session_label}")
                     #     continue
     
-                    if os.path.exists(os.path.join(output_dir, 'YT', 'DICOM', f'YT-{session_label}-{session_date}')):
-                        print(f'Session directory already exists. Assuming data downloaded previously.')
-                        proceed=False                     
-                    # Create the output directory if it doesn't exist
-                    try:
-                        os.makedirs(output_directory, exist_ok=False)
-                    except:
-                        print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
-                        proceed=False                     
+                
+                    # # Create the output directory if it doesn't exist
+                    # try:
+                    #     os.makedirs(output_directory, exist_ok=False)
+                    # except:
+                    #     print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
+                    #     proceed=False                     
+                            
+                            
+                    # Add BIDS folder to YA/YT folder, if doesn't exist
+                    if not os.path.exists(os.path.join(output_dir, group, 'BIDS')):
+                        os.mkdir(os.path.join(output_dir, group, 'BIDS')) 
+
                             
                     if proceed:
                         
@@ -355,6 +369,8 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         print(f"Select result: {result}")
                         
                         print(f"Finished downloading {session_label}.\n")
+                        
+                        rename_folders(output_dir)
         else:
             print(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")
 
@@ -390,5 +406,5 @@ if __name__ == '__main__':
 
     # Download the data
     download_xnat_data(args.fqdn, args.username, args.password, session_labels, args.overwrite, args.output_dir, args.project_id)
-    rename_folders(args.output_dir)
+    #rename_folders(args.output_dir)
 

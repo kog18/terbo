@@ -89,7 +89,35 @@ def run_query(connection, query):
     cursor.close()
 
     return results
- 
+
+def get_all_resource_types(connection):
+    result = run_query(connection, "SELECT type FROM resource_types;") 
+    return result
+
+def add_new_resource_type(connection, resource_type):
+    result = run_query(connection, f"INSERT INTO resource_types(type) VALUES ('{resource_type}');")
+    return result
+
+def get_resource_count_by_type(connection, session_id, resource_type):
+    result = run_query(connection, f"SELECT count(*) FROM resources WHERE study_id = '{session_id}' and type_code = (SELECT id FROM resource_types WHERE type = '{resource_type}');")
+    return result
+
+def insert_new_resource(connection, session_id, resource_type):
+    result = run_query(connection, f"INSERT INTO resources(study_id, first_dw_date, last_dw_date, type_code) VALUES ('{session_id}',NOW(),NOW(),(SELECT id FROM resource_types WHERE type = '{resource_type}'));")
+    return result
+
+def update_resource_dw_date(connection, session_id):
+    result = run_query(connection, f"UPDATE resources SET last_dw_date = NOW() WHERE study_id = '{session_id}';")
+    return result
+
+def insert_new_study(connection, session_label, session_id, project_id):
+    result = run_query(connection, f"INSERT INTO studies(study_label, study_xnat_id, study_xnat_project_id, create_date, first_dw_date, last_dw_date) VALUES ('{session_label}','{session_id}','{project_id}',NOW(),NOW(),NOW());")
+    return result
+
+def get_all_studies(connection):
+    result = run_query(connection, "SELECT * FROM studies;")
+    return result
+
 # Changing the downloaded file structure to combine scan ID with scan type for folder names and create DICOM and BIDS folders
 def rename_folders(root_path):
     for folder1 in os.listdir(root_path):
@@ -175,8 +203,9 @@ def get_subject_group(host, auth, session_id):
 
     return group_id
         
-def create_metadata(auth, api_path, output_dir, level, session_label):
+def create_metadata(auth, host, output_dir, level, session_id):
     
+    api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note'
     print(f'{api_path}')
     # Get session list
     url = api_path
@@ -213,9 +242,9 @@ def download_resources(host, auth, session_id, output_dir):
         list_of_rows.pop(0)
         print(list_of_rows)
         for row in list_of_rows:
+            # If resource exists and files exist for that resource
             if row[1] and row[6]:
                 resource_type=row[1]
-                files_number=row[6]
                 resource_url = f"{host}/data/archive/experiments/{session_id}/resources/{resource_type}/files?format=zip&structure=legacy"
                 #print(scan_url)
                 response = requests.get(resource_url, auth=auth, stream=True)
@@ -239,12 +268,30 @@ def download_resources(host, auth, session_id, output_dir):
                     for zip_info in file.infolist():
                         zip_info.filename = zip_info.filename.split("/")[-1]
                         file.extract(zip_info, resource_type_dir)
-
-                os.remove(output_path)                
-        else:
-            print('Associated resources not found.')
+                
+                # Remove the zip file
+                os.remove(output_path)       
+                
+                connection = get_db_connection()
+                
+                # Check if resource of this type is defined in the db, if not - create it
+                all_types = get_all_resource_types(connection)
+                print(f"Select result: {all_types}")
+                
+                if resource_type not in all_types[0]:
+                    add_new_resource_type(connection, resource_type)
+                                        
+                ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
+                res_count = get_resource_count_by_type(connection, session_id, resource_type)
+                if int(res_count[0][0]) > 0:
+                    result = update_resource_dw_date(connection, session_id)
+                else:    
+                    result = insert_new_resource(connection, session_id, resource_type)                
+                    print(f"Insert result: {result}")                         
+        # else:
+        #     print('Associated resources not found.')
     else:
-        print(f"Failed to resource info. Status code: {response.status_code}")
+        print(f"Failed to get resource info. Status code: {response.status_code}")
     
 def download_xnat_data(host, username, password, session_labels, overwrite, output_dir, project_id):
     # Authenticate with XNAT using username and password
@@ -290,6 +337,12 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                      
                     if os.path.exists(output_directory):
                         print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
+                        
+                        #TODO: Check if download resources override is set, then overwrite resources, don't re-download data
+                        # if is_resource_override:
+                        #     download_resources(host, auth, session_id, output_directory)
+                            
+                         
                         proceed=False
                     else:
                         os.makedirs(output_directory)                    
@@ -357,16 +410,18 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         # Get metadata
                         #session_api_path = f'{host}/data/archive/projects/{project_id}/experiments?xsiType=xnat:mrSessionData&format=csv&columns=ID,label,xnat:subjectData/label'
                         # scan_api_path = f'{host}/data/archive/projects/{project_id}/experiments?xsiType=xnat:mrSessionData&format=csv&columns=project,label,xnat:mrScanData/ID,xnat:mrScanData/type'
-                        scan_api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note'
-                        #create_metadata(auth, session_api_path, output_directory, "session", session_label)         
-                        create_metadata(auth, scan_api_path, output_directory, "scan", session_label)
+                        ##scan_api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note'
+                        #create_metadata(auth, session_api_path, output_directory, "session", session_label)  
+                               
+                        create_metadata(auth, host, output_directory, "scan", session_id)
                         download_resources(host, auth, session_id, output_directory)
                         
                         connection = get_db_connection()
-                        result = run_query(connection, f"INSERT INTO studies(study_label, study_xnat_id, study_xnat_project_id, create_date, first_dw_date, last_dw_date) VALUES ('{session_label}','{session_id}','{project_id}',NOW(),NOW(),NOW());")
-                        print(f"Insert result: {result}")
-                        result = run_query(connection, "SELECT * FROM studies;") 
-                        print(f"Select result: {result}")
+                        result = insert_new_study(connection, session_label, session_id, project_id)
+                        print(f"Insert study result: {result}")
+                        
+                        get_all_studies(connection) 
+                        print(f"Select studies result: {result}")
                         
                         print(f"Finished downloading {session_label}.\n")
                         

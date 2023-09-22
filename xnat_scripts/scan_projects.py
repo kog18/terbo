@@ -19,7 +19,7 @@ def send_email(body):
     msg['Subject'] = "TERBO QC report"
     msg['From'] = 'TERBO QC <alexandr.kogan@osumc.edu>'
     msg['To'] = 'TERBO Imaging <terbo.imaging.ra@fstrf.org>'
-    msg['Bcc'] = 'Alex Kogan <kogan.33@osu.edu>'
+    msg['Bcc'] = 'Alex Kogan <kogan.34@osu.edu>'
     msg.set_content(body)
     
     current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")

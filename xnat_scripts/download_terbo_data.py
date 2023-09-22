@@ -14,8 +14,7 @@ import shutil
 import sys
 from requests.auth import HTTPBasicAuth
 import configparser
-import psycopg2
-#from pickle import TRUE 
+import psycopg2 
 
 """ 
 Command line example:
@@ -110,6 +109,10 @@ def update_resource_dw_date(connection, session_id):
     result = run_query(connection, f"UPDATE resources SET last_dw_date = NOW() WHERE study_id = '{session_id}';")
     return result
 
+def update_study_dw_date(connection, session_id):
+    result = run_query(connection, f"UPDATE studies SET last_dw_date = NOW() WHERE study_xnat_id = '{session_id}';")
+    return result
+
 def insert_new_study(connection, session_label, session_id, project_id):
     result = run_query(connection, f"INSERT INTO studies(study_label, study_xnat_id, study_xnat_project_id, create_date, first_dw_date, last_dw_date) VALUES ('{session_label}','{session_id}','{project_id}',NOW(),NOW(),NOW());")
     return result
@@ -117,6 +120,13 @@ def insert_new_study(connection, session_label, session_id, project_id):
 def get_all_studies(connection):
     result = run_query(connection, "SELECT * FROM studies;")
     return result
+
+def is_study(connection, session_id):
+    result = run_query(connection, f"SELECT count(*) FROM studies where study_xnat_id = '{session_id}';")
+    if result[0][0] != 0:
+        return True
+    else:
+        return False
 
 # Changing the downloaded file structure to combine scan ID with scan type for folder names and create DICOM and BIDS folders
 def rename_folders(root_path):
@@ -196,13 +206,26 @@ def get_subject_group(host, auth, session_id):
             group_id=list_of_rows[0][2]
         else:
             print('The group is not set.')
+            group_id=""
         # for record in list_of_rows:
         #     group_id=record[2]
     else:
         print(f"Failed to retrieve subject group. Status code: {response.status_code}")
 
     return group_id
-        
+
+def rearrange_csv_columns(infile_path, outfile_path):
+    # Move quality and note columns to the end of the csv file
+    with open(infile_path, 'r') as infile, open(outfile_path, 'a') as outfile:
+        # output dict needs a list for new column ordering
+        fieldnames=['xnat_imagescandata_id','ID','type','xnat:mrsessiondata/project','xnat:mrsessiondata/label','URI','quality','note']
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        # reorder the header first
+        writer.writeheader()
+        for row in csv.DictReader(infile):
+            # writes the reordered rows to the new file
+            writer.writerow(row) 
+                       
 def create_metadata(auth, host, output_dir, level, session_id):
     
     api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note'
@@ -221,11 +244,12 @@ def create_metadata(auth, host, output_dir, level, session_id):
         os.makedirs(meta_dir, exist_ok=True)
         
         # write out the csv file
-        with open(f'{meta_dir}/{level}_metadata.csv', "w", newline='') as csvFile:
+        with open(f'{meta_dir}/{level}_metadata_tmp.csv', "w", newline='') as csvFile:
             writer = csv.writer(csvFile)
             for line in decoded_content.splitlines():
                 writer.writerow(line.split(','))
         # print("Done.")
+        rearrange_csv_columns(f'{meta_dir}/{level}_metadata_tmp.csv',f'{meta_dir}/{level}_metadata.csv')
     else:
         print(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
         
@@ -252,6 +276,8 @@ def download_resources(host, auth, session_id, output_dir):
                 resource_dir = os.path.join(output_dir,"resources")
                 resource_type_dir = os.path.join(resource_dir, resource_type)
                 os.makedirs(resource_dir, exist_ok=True)
+                
+                #TODO: Overwrite logic
                 os.makedirs(resource_type_dir, exist_ok=True)
                     
                 # Save the resource data to a file
@@ -293,7 +319,7 @@ def download_resources(host, auth, session_id, output_dir):
     else:
         print(f"Failed to get resource info. Status code: {response.status_code}")
     
-def download_xnat_data(host, username, password, session_labels, overwrite, output_dir, project_id):
+def download_xnat_data(host, username, password, session_labels, overwrite, output_dir, project_id, res_overwrite):
     # Authenticate with XNAT using username and password
     auth = HTTPBasicAuth(username, password)
 
@@ -301,7 +327,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
     for session_label in session_labels:
         
         xnat_url = f"{host}/data/archive/projects/{project_id}/experiments?xsiType=xnat:mrSessionData&format=csv&columns=ID,label,date,xnat:subjectData/label"
-        print(xnat_url)
+        #print(xnat_url)
         # Make a GET request to retrieve the scan data for the session
         response = requests.get(xnat_url, auth=auth)
         
@@ -339,10 +365,9 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
                         
                         #TODO: Check if download resources override is set, then overwrite resources, don't re-download data
-                        # if is_resource_override:
-                        #     download_resources(host, auth, session_id, output_directory)
+                        if res_overwrite:
+                            download_resources(host, auth, session_id, output_directory)
                             
-                         
                         proceed=False
                     else:
                         os.makedirs(output_directory)                    
@@ -417,19 +442,24 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         download_resources(host, auth, session_id, output_directory)
                         
                         connection = get_db_connection()
-                        result = insert_new_study(connection, session_label, session_id, project_id)
+                        if is_study(connection, session_id):
+                            result = update_study_dw_date(connection, session_id)
+                        else:
+                            result = insert_new_study(connection, session_label, session_id, project_id)
+                            
                         print(f"Insert study result: {result}")
                         
-                        get_all_studies(connection) 
+                        result = get_all_studies(connection) 
                         print(f"Select studies result: {result}")
                         
                         print(f"Finished downloading {session_label}.\n")
                         
-                        rename_folders(output_dir)
+                        # rename_folders(output_dir)
         else:
             print(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")
 
-
+    rename_folders(output_dir)    
+        
 if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Download imaging data from a remote XNAT system')
@@ -440,17 +470,18 @@ if __name__ == '__main__':
     parser.add_argument('-x', '--overwrite', action='store_true', help='Overwrite output directory if it exists')
     parser.add_argument('-d', '--output-dir', required=True, help='Output directory for downloaded data')
     parser.add_argument('-i', '--project-id', required=True, help='XNAT project ID')
+    parser.add_argument('-r', '--res_overwrite', action='store_true', help='Overwrite resource if session directory exists')
     args = parser.parse_args()
 
     
-    # Need a working directory in user's home to store download information 
-    home_directory = os.path.expanduser( '~' )
-    output_directory = os.path.join( home_directory, 'xnat_download')
+    # # Need a working directory in user's home to store download information 
+    # home_directory = os.path.expanduser( '~' )
+    # output_directory = os.path.join( home_directory, 'xnat_download')
     
     
-    # Create working directory. This directory will store information about downloaded data.
-    if not os.path.isdir(output_directory):
-        os.makedirs(output_directory)
+    # # Create working directory. This directory will store information about downloaded data.
+    # if not os.path.isdir(output_directory):
+    #     os.makedirs(output_directory)
     
     # Split the session labels into a list
     session_labels = args.session_labels.split(',')
@@ -460,6 +491,6 @@ if __name__ == '__main__':
         args.password = getpass.getpass(prompt='XNAT password: ')
 
     # Download the data
-    download_xnat_data(args.fqdn, args.username, args.password, session_labels, args.overwrite, args.output_dir, args.project_id)
+    download_xnat_data(args.fqdn, args.username, args.password, session_labels, args.overwrite, args.output_dir, args.project_id, args.res_overwrite)
     #rename_folders(args.output_dir)
 

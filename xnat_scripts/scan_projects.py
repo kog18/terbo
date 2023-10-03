@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 from email.message import EmailMessage
 
-verbose = False
+verbose = True
 
 def send_email(body):
     # Create the base text message.
@@ -19,10 +19,10 @@ def send_email(body):
     msg['Subject'] = "TERBO QC report"
     msg['From'] = 'TERBO QC <alexandr.kogan@osumc.edu>'
     msg['To'] = 'TERBO Imaging <terbo.imaging.ra@fstrf.org>'
-    msg['Bcc'] = 'Alex Kogan <kogan.34@osu.edu>'
+    msg['Bcc'] = 'Alex Kogan <kogan.33@osu.edu>'
     msg.set_content(body)
     
-    current_datetime = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     str_current_datetime = str(current_datetime)
     file_name = os.path.join(os.path.expanduser('~'), "log", "log_"+str_current_datetime+".txt")
     
@@ -50,14 +50,14 @@ def create_email(errors_array):
                     else:
                         error+=", "+item[0]
             else:
-                error+=errors_array[project][subject][0]    
+                error+=str(errors_array[project][subject][0][0])    
 
             email_body+=f"\n\tSubject: {subject}: {error}"
     
     email_body+="\n\nTo modify the items listed above, please go to NURIPS <nuripsweb01.fsm.northwestern.edu>"
     return email_body            
 
-# Checks if a string consists of 6 numbers, an optional letter at the end and no special characters.
+# Checks if a string consists of 6 or 7 numbers, an optional letter at the end and no special characters.
 def is_valid_label(id_string):
     special_characters = re.compile(r"[^\d\w]")
     if len(id_string) < 6 or len(id_string) > 8 :
@@ -88,51 +88,94 @@ for p in project_list:
 
     sub_arr=dict()
     for s in subjects:
+        subject_errors=[]
         slabel=project.subject(s).attrs.get("label")
         group=project.subject(s).attrs.get("group")
 
         if group:
-            if not (group == "YA" or group == "YT"):
+            if not (group == "YA" or group == "YT" or "YA" in group or "YT" in group):
                 ## Malformed group value
-                sub_arr[slabel]=[f"malformed group: {group}"]
+                if len(subject_errors)>0:
+                    subject_errors.append([f"malformed group: {group}"])
+                else:
+                    subject_errors=[[f"malformed group: {group}"]]
                 
                 # Check if subject id is valid
                 if not is_valid_label(slabel):
-                    sub_arr[slabel]=[sub_arr[slabel],["malformed subject id"]] if slabel in sub_arr else ["malformed subject id"]
-                audit_array[p]=sub_arr
+
+                    print("\tInvalid label")
+                    if len(subject_errors)>0:
+                        subject_errors.append(["malformed subject id"])
+                    else:
+                        subject_errors=[["malformed subject id"]]
             else:
                 # Check validity of subject id if group value is correct
                 if not is_valid_label(slabel):
-                    sub_arr[slabel]=[sub_arr[slabel],["malformed subject id"]] if slabel in sub_arr else ["malformed subject id"]
-                if len(sub_arr)>0:
-                    audit_array[p]=sub_arr                    
+
+                    print("\tInvalid label")
+                    if len(subject_errors)>0:
+                        subject_errors.append(["malformed subject id"]) 
+                    else:
+                        subject_errors=[["malformed subject id"]]
         else:
             ## Missing group value
-                sub_arr[slabel]=["missing group"]
+
+                if len(subject_errors)>0:
+                    subject_errors.append(["missing group"]) 
+                else:
+                    subject_errors=[["missing group"]]
                 
                 # Check if subject id is valid
                 if not is_valid_label(slabel):
-                    sub_arr[slabel]=[sub_arr[slabel],["malformed subject id"]] if slabel in sub_arr else ["malformed subject id"]
-                audit_array[p]=sub_arr
-            
+
+                    if len(subject_errors)>0:
+                        subject_errors.append(["malformed subject id"]) 
+                    else:
+                        subject_errors=["malformed subject id"]
+        
         if verbose:
             print(f'\tsubject: {slabel}, group: {group}')
+        
         for session in project.subject(s).experiments().get():
+            #session_errors=[]
             sess_label=project.subject(s).experiment(session).label()
             resources = project.subject(s).experiment(session).resources()
-            #print(f'\t\tsession: {sess_label}')
+            if verbose:
+                print(f'\t\tsession: {sess_label}')
+            #print(f"resource len: {len(resources.get())}")
+            resource_count=0
+            if len(resources.get()) == 0:
+                
+                if verbose:
+                    print("\t\tmissing resource")
+
+                if len(subject_errors)>0 or subject_errors is not None:
+                    subject_errors.append([f"missing resource folder in session {sess_label}"])
+                else:
+                    subject_errors=[f"missing resource folder in session {sess_label}"]
+                
             for resource in resources:
                 r=resource.label()
                 if verbose:
-                    print(f'\t\tsession: {sess_label}')
+                    print(f"\t\tresource len: {len(project.subject(s).experiment(session).resources().get())}")
                     print(f'\t\t\tResource type: {resource.label()}, # of files: {len(project.subject(s).experiment(session).resource(resource.id()).files().get())}')
-                #print(f'\t\tresources: {resource.label()}, # of files: {resource.attributes()}')
+            
+        if verbose:
+            print(f"\tsubject errors2: {subject_errors}")    
 
+        if len(subject_errors)>0:
+            sub_arr[slabel]=subject_errors
+    # if len(sub_arr)>0:
+    #     print(f"\tSubarr: {sub_arr}")     
+           
+    if len(sub_arr)>0:
+        audit_array[p]=sub_arr       
+     
 if verbose:
-    print(audit_array)
+    print(f"Audit array2: {audit_array}")
 
 if verbose:
     print(create_email(audit_array))
     
-send_email(create_email(audit_array))
+#send_email(create_email(audit_array))
 

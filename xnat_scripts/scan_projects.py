@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 from email.message import EmailMessage
 
-verbose = True
+verbose = False
 
 def send_email(body):
     # Create the base text message.
@@ -93,7 +93,7 @@ for p in project_list:
         group=project.subject(s).attrs.get("group")
 
         if group:
-            if not (group == "YA" or group == "YT" or "YA" in group or "YT" in group):
+            if not ("YA" in group or "YT" in group):
                 ## Malformed group value
                 if len(subject_errors)>0:
                     subject_errors.append([f"malformed group: {group}"])
@@ -103,7 +103,6 @@ for p in project_list:
                 # Check if subject id is valid
                 if not is_valid_label(slabel):
 
-                    print("\tInvalid label")
                     if len(subject_errors)>0:
                         subject_errors.append(["malformed subject id"])
                     else:
@@ -112,7 +111,6 @@ for p in project_list:
                 # Check validity of subject id if group value is correct
                 if not is_valid_label(slabel):
 
-                    print("\tInvalid label")
                     if len(subject_errors)>0:
                         subject_errors.append(["malformed subject id"]) 
                     else:
@@ -177,5 +175,5 @@ if verbose:
 if verbose:
     print(create_email(audit_array))
     
-#send_email(create_email(audit_array))
+send_email(create_email(audit_array))
 

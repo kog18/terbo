@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 from email.message import EmailMessage
 
-verbose = False
+verbose = True
 
 def send_email(body):
     # Create the base text message.
@@ -158,8 +158,8 @@ for p in project_list:
                     print(f"\t\tresource len: {len(project.subject(s).experiment(session).resources().get())}")
                     print(f'\t\t\tResource type: {resource.label()}, # of files: {len(project.subject(s).experiment(session).resource(resource.id()).files().get())}')
             
-        if verbose:
-            print(f"\tsubject errors2: {subject_errors}")    
+        # if verbose:
+        #     print(f"\tsubject errors2: {subject_errors}")    
 
         if len(subject_errors)>0:
             sub_arr[slabel]=subject_errors
@@ -170,10 +170,8 @@ for p in project_list:
         audit_array[p]=sub_arr       
      
 if verbose:
-    print(f"Audit array2: {audit_array}")
-
-if verbose:
+    #print(f"Audit array2: {audit_array}")
     print(create_email(audit_array))
     
-send_email(create_email(audit_array))
+#send_email(create_email(audit_array))
 

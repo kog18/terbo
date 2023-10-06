@@ -214,17 +214,7 @@ def get_subject_group(host, auth, session_id):
 
     return group_id
 
-def rearrange_csv_columns(infile_path, outfile_path):
-    # Move quality and note columns to the end of the csv file
-    with open(infile_path, 'r') as infile, open(outfile_path, 'a') as outfile:
-        # output dict needs a list for new column ordering
-        fieldnames=['xnat_imagescandata_id','ID','type','xnat:mrsessiondata/project','xnat:mrsessiondata/label','URI','quality','note']
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        # reorder the header first
-        writer.writeheader()
-        for row in csv.DictReader(infile):
-            # writes the reordered rows to the new file
-            writer.writerow(row) 
+
                        
 def create_metadata(auth, host, output_dir, level, session_id):
     
@@ -243,13 +233,16 @@ def create_metadata(auth, host, output_dir, level, session_id):
         meta_dir = os.path.join(output_dir,"metadata")
         os.makedirs(meta_dir, exist_ok=True)
         
-        # write out the csv file
-        with open(f'{meta_dir}/{level}_metadata_tmp.csv', "w", newline='') as csvFile:
+        neworder=[0,2,3,5,6,7,1,4]
+        # write out the csv file, change order according to the new order index
+        with open(f'{meta_dir}/{level}_metadata.csv', "w", newline='5') as csvFile:
             writer = csv.writer(csvFile)
             for line in decoded_content.splitlines():
-                writer.writerow(line.split(','))
+                line=line.split(',')
+                line = [line[i] for i in neworder]
+                writer.writerow(line)
         # print("Done.")
-        rearrange_csv_columns(f'{meta_dir}/{level}_metadata_tmp.csv',f'{meta_dir}/{level}_metadata.csv')
+        #rearrange_csv_columns(f'{meta_dir}/{level}_metadata_tmp.csv',f'{meta_dir}/{level}_metadata.csv')
     else:
         print(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
         

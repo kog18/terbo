@@ -68,8 +68,9 @@ def send_email(sender, recipient, subject, body):
 def get_db_connection():
     # Read the configuration file
     config = configparser.ConfigParser()
-    config.read("database.ini")
+    db_file_name = config.read("database.ini")
     
+    logger.debug(f"Reading file: {db_file_name}")
     # Get the connection information from the configuration file
     host = config["postgresql"]["host"]
     port = config["postgresql"]["port"]

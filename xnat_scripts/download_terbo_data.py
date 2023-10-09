@@ -235,7 +235,7 @@ def create_metadata(auth, host, output_dir, level, session_id):
         
         neworder=[0,2,3,5,6,7,1,4]
         # write out the csv file, change order according to the new order index
-        with open(f'{meta_dir}/{level}_metadata.csv', "w", newline='5') as csvFile:
+        with open(f'{meta_dir}/{level}_metadata.csv', "w", newline='') as csvFile:
             writer = csv.writer(csvFile)
             for line in decoded_content.splitlines():
                 line=line.split(',')

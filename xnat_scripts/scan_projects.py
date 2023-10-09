@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 from email.message import EmailMessage
 
-verbose = False
+verbose = True
 
 def send_email(body):
     # Create the base text message.
@@ -24,7 +24,7 @@ def send_email(body):
     
     current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     str_current_datetime = str(current_datetime)
-    file_name = os.path.join(os.path.expanduser('~'), "log", "log_"+str_current_datetime+".txt")
+    file_name = os.path.join(os.path.expanduser('~'), "log", "scan_"+str_current_datetime+".log")
     
     # Make a local copy of what we are going to send.
     with open(file_name, 'wb') as f:
@@ -173,5 +173,5 @@ if verbose:
     #print(f"Audit array2: {audit_array}")
     print(create_email(audit_array))
     
-send_email(create_email(audit_array))
+#send_email(create_email(audit_array))
 

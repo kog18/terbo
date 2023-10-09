@@ -15,6 +15,28 @@ import sys
 from requests.auth import HTTPBasicAuth
 import configparser
 import psycopg2 
+from datetime import datetime
+import logging
+
+current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+str_current_datetime = str(current_datetime)
+file_name = os.path.join(os.path.expanduser('~'), "log", "dw_"+str_current_datetime+".log")
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.DEBUG)
+file_handler = logging.FileHandler(filename=file_name)
+file_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stdout_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+logger.addHandler(stdout_handler)
+logger.addHandler(file_handler)
+    
+    
+logger.debug("Starting...")
 
 """ 
 Command line example:

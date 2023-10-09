@@ -17,6 +17,7 @@ import configparser
 import psycopg2 
 from datetime import datetime
 import logging
+import pathlib
 
 current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 str_current_datetime = str(current_datetime)
@@ -66,9 +67,12 @@ def send_email(sender, recipient, subject, body):
     os.system(command)
     
 def get_db_connection():
+    
+    print(f"working dir: {os.getcwd()}")
     # Read the configuration file
     config = configparser.ConfigParser()
-    db_file_name = config.read("database.ini")
+    db_config_path = pathlib.Path(__file__).parent.absolute() / "database.ini"
+    db_file_name = config.read(db_config_path)
     
     logger.debug(f"Reading file: {db_file_name}")
     # Get the connection information from the configuration file

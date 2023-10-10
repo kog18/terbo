@@ -18,6 +18,8 @@ import psycopg2
 from datetime import datetime
 import logging
 import pathlib
+import smtplib
+from email.message import EmailMessage
 
 current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 str_current_datetime = str(current_datetime)
@@ -46,35 +48,70 @@ python download_terbo_data.py -f https://nuripsweb01.fsm.northwestern.edu -u ako
  To do: check db connection, insert & select queries
  
 """
-def send_email(sender, recipient, subject, body):
-    """Sends an email using the Linux mail command.
 
-    Args:
-        sender (str): The sender's email address.
-        recipient (str): The recipient's email address.
-        subject (str): The email subject.
-        body (str): The email body.
-    """
+def send_email(body):
+    
 
-    # Create the mail command.
-    command = "mail -s {subject} {recipient} < {body}".format(
-        subject=subject,
-        recipient=recipient,
-        body=body
-    )
+    config = configparser.ConfigParser()
+    db_config_path = pathlib.Path(__file__).parent.absolute() / "config.ini"
+    db_file_name = config.read(db_config_path)
+        
+    # Create the base text message.
+    msg = EmailMessage()
+    msg['Subject'] = config["mail"]["subject"]
+    msg['From'] = config["mail"]["from"]
+    msg['To'] = config["mail"]["to"]
+    msg['Bcc'] = config["mail"]["bcc"]
+    msg.set_content(body)
+    
+    current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    str_current_datetime = str(current_datetime)
+    file_name = os.path.join(os.path.expanduser('~'), "log", "scan_"+str_current_datetime+".log")
+    
+    # Make a local copy of what we are going to send.
+    with open(file_name, 'wb') as f:
+        f.write(bytes(msg))
+    
+    # Send the message via local SMTP server.
+    with smtplib.SMTP('localhost') as s:
+        s.send_message(msg)
 
-    # Run the mail command.
-    os.system(command)
+def create_email(errors_array):
+    email_body="This is an automated message.\n\n"
+    email_body+="The following studies were downloaded from TERBO projects on NURIPS:\n"
+    email_body+=f"\n\tSubject: "
+    
+    email_body+="\n\nTo modify the items listed above, please go to NURIPS <nuripsweb01.fsm.northwestern.edu>"
+    return email_body  
+      
+# def send_email(sender, recipient, subject, body):
+#     """Sends an email using the Linux mail command.
+#
+#     Args:
+#         sender (str): The sender's email address.
+#         recipient (str): The recipient's email address.
+#         subject (str): The email subject.
+#         body (str): The email body.
+#     """
+#
+#     # Create the mail command.
+#     command = "mail -s {subject} {recipient} < {body}".format(
+#         subject=subject,
+#         recipient=recipient,
+#         body=body
+#     )
+#
+#     # Run the mail command.
+#     os.system(command)
     
 def get_db_connection():
     
-    print(f"working dir: {os.getcwd()}")
+    #print(f"working dir: {os.getcwd()}")
     # Read the configuration file
     config = configparser.ConfigParser()
-    db_config_path = pathlib.Path(__file__).parent.absolute() / "database.ini"
+    db_config_path = pathlib.Path(__file__).parent.absolute() / "config.ini"
     db_file_name = config.read(db_config_path)
     
-    logger.debug(f"Reading file: {db_file_name}")
     # Get the connection information from the configuration file
     host = config["postgresql"]["host"]
     port = config["postgresql"]["port"]
@@ -255,6 +292,7 @@ def create_metadata(auth, host, output_dir, level, session_id):
     if response.status_code == 200:
         decoded_content = response.content.decode('utf-8')
         #csv_reader = csv.reader(decoded_content.splitlines(), delimiter=',')
+        logger.debug(f"Downloading {level} metadata.")
         print(f"Downloading {level} metadata.")
         # make metadata dir
         meta_dir = os.path.join(output_dir,"metadata")
@@ -308,6 +346,7 @@ def download_resources(host, auth, session_id, output_dir):
                         f.write(chunk)
                 
                 print ("Resource download completed. Extracting...")
+                logger.debug("Resource download completed. Extracting...")
                 
                 # Extract data without the directory structure (files only), remove the zip file
                 with zipfile.ZipFile(output_path) as file:
@@ -323,8 +362,9 @@ def download_resources(host, auth, session_id, output_dir):
                 # Check if resource of this type is defined in the db, if not - create it
                 all_types = get_all_resource_types(connection)
                 print(f"Select result: {all_types}")
+                logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
                 
-                if resource_type not in all_types[0]:
+                if resource_type not in all_types:
                     add_new_resource_type(connection, resource_type)
                                         
                 ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
@@ -418,6 +458,8 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                     if proceed:
                         
                         print (f"Downloading {session_label} data")
+                        logger.debug(f"Downloading {session_label} data")
+                        
                         # Download the scan data
                         scan_url = f"{host}/data/experiments/{session_id}/scans/ALL/files?format=zip&structure=legacy"
                         #print(scan_url)
@@ -431,6 +473,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                                 f.write(chunk)
                         
                         print ("Download completed. Extracting...")
+                        logger.debug("Download completed. Extracting...")
                         
                         # Extract data, remove zip file
                         with zipfile.ZipFile(output_path) as file:
@@ -443,7 +486,8 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         try:
                             shutil.move(os.path.join(output_directory,session_label,"SCANS"),output_directory) 
                         except:
-                            print(f"Error moving {os.path.join(output_directory,session_label,'SCANS')} to {output_directory}")  
+                            print(f"Error moving {os.path.join(output_directory,session_label,'SCANS')} to {output_directory}")
+                            logger.debug(f"Error moving {os.path.join(output_directory,session_label,'SCANS')} to {output_directory}")  
                               
                         try:
                             shutil.rmtree(os.path.join(output_directory,session_label))

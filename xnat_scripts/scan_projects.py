@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 from email.message import EmailMessage
 
-verbose = True
+verbose = False
 
 def send_email(body):
     # Create the base text message.
@@ -173,5 +173,5 @@ if verbose:
     #print(f"Audit array2: {audit_array}")
     print(create_email(audit_array))
     
-#send_email(create_email(audit_array))
+send_email(create_email(audit_array))
 

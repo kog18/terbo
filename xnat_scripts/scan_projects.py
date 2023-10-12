@@ -148,9 +148,9 @@ for p in project_list:
                     print("\t\tmissing resource")
 
                 if len(subject_errors)>0 or subject_errors is not None:
-                    subject_errors.append([f"missing resource folder in session {sess_label}"])
+                    subject_errors.append([f"missing behavioral data folder in session {sess_label}"])
                 else:
-                    subject_errors=[f"missing resource folder in session {sess_label}"]
+                    subject_errors=[f"missing behavioral data folder in session {sess_label}"]
                 
             for resource in resources:
                 r=resource.label()

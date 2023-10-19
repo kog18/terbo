@@ -34,9 +34,16 @@ def send_email(body):
     with smtplib.SMTP('localhost') as s:
         s.send_message(msg)
 
-def create_email(errors_array):
+def create_email(errors_array,count_array):
     email_body="This is an automated message.\n\n"
-    email_body+="The following errors were found in TERBO projects on NURIPS:\n"
+    email_body+="Project summary:\n\n"
+    
+    for key in count_array.keys():
+        project=key
+        email_body+=f"Project: {project}: {count_array[project]} session{'' if count_array[project] == 1 else 's'}\n"
+    
+    
+    email_body+="\n\nThe following errors were found in TERBO projects on NURIPS:"    
     for key in errors_array.keys():
         project=key
         email_body+=f"\n\nProject: {project}\n"
@@ -71,15 +78,17 @@ def is_valid_label(id_string):
     
 nurips = Interface(config="./nurips.cfg")
 
-project_list=('TERBO_Baylor','TERBO_Lurie','TERBO_Maiami','TERBO_Bronx','TERBO_Colorado','TERBO_StJude','TERBO_UCSD')
+project_list=('TERBO_Baylor','TERBO_Lurie','TERBO_Miami','TERBO_Bronx','TERBO_Colorado','TERBO_StJude','TERBO_UCSD')
 
 #TODO:
 # def check_resources():
 # pass
 
 audit_array=dict()
+count_array=dict()
 
-for p in project_list:        
+for p in project_list:  
+    sess_count=0      
     project = nurips.select.project(p)
     if verbose:
         print(f'Project: {p}')
@@ -135,6 +144,7 @@ for p in project_list:
             print(f'\tsubject: {slabel}, group: {group}')
         
         for session in project.subject(s).experiments().get():
+            sess_count+=1
             #session_errors=[]
             sess_label=project.subject(s).experiment(session).label()
             resources = project.subject(s).experiment(session).resources()
@@ -165,13 +175,14 @@ for p in project_list:
             sub_arr[slabel]=subject_errors
     # if len(sub_arr)>0:
     #     print(f"\tSubarr: {sub_arr}")     
+    count_array[p]=sess_count
            
     if len(sub_arr)>0:
         audit_array[p]=sub_arr       
      
 if verbose:
     #print(f"Audit array2: {audit_array}")
-    print(create_email(audit_array))
+    print(create_email(audit_array, count_array))
     
-send_email(create_email(audit_array))
+send_email(create_email(audit_array, count_array))
 

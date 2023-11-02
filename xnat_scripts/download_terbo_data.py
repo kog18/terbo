@@ -341,8 +341,8 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                 print(f"Select result: {all_types}")
                 #logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
                 
-                if resource_type.lower() not in all_types[0]:
-                    add_new_resource_type(connection, resource_type.lower())
+                if resource_type.lower().strip() not in all_types[0]:
+                    add_new_resource_type(connection, resource_type.lower().strip())
                                         
                 ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
                 res_count = get_resource_count_by_type(connection, session_id, resource_type.lower())

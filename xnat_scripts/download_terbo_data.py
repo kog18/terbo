@@ -8,7 +8,6 @@ import os
 import argparse
 import requests
 import csv
-import json
 import zipfile
 import shutil
 import sys
@@ -37,7 +36,7 @@ stdout_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 logger.addHandler(stdout_handler)
 logger.addHandler(file_handler)
-    
+logging.getLogger("urllib3").setLevel(logging.WARNING)   
     
 logger.debug("Starting...")
 
@@ -48,6 +47,9 @@ python download_terbo_data.py -f https://nuripsweb01.fsm.northwestern.edu -u ako
  To do: check db connection, insert & select queries
  
 """
+
+dw_projects = dict()
+dw_resources = []
 
 def send_email(body):
     
@@ -66,7 +68,7 @@ def send_email(body):
     
     current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     str_current_datetime = str(current_datetime)
-    file_name = os.path.join(os.path.expanduser('~'), "log", "scan_"+str_current_datetime+".log")
+    file_name = os.path.join(os.path.expanduser('~'), "log", "dw_email_"+str_current_datetime+".log")
     
     # Make a local copy of what we are going to send.
     with open(file_name, 'wb') as f:
@@ -76,33 +78,24 @@ def send_email(body):
     with smtplib.SMTP('localhost') as s:
         s.send_message(msg)
 
-def create_email(errors_array):
+def create_email(dw_projects,dw_resources):
     email_body="This is an automated message.\n\n"
-    email_body+="The following studies were downloaded from TERBO projects on NURIPS:\n"
-    email_body+=f"\n\tSubject: "
     
-    email_body+="\n\nTo modify the items listed above, please go to NURIPS <nuripsweb01.fsm.northwestern.edu>"
+    if len(dw_projects)>0:
+        email_body+="The following data were downloaded from TERBO projects on NURIPS:\n"
+        
+        for project in dw_projects.keys():
+            email_body+=f"\n\tProject: "
+            for s in dw_projects[project]:
+                email_body+=f"\n\t\tSession: {s} "
+    
+    if len(dw_resources)>0:
+        email_body+="\n\nResources for the following sessions were downloaded from TERBO projects on NURIPS:\n"
+                  
+        for s in dw_resources:
+            email_body+=f"\n\t\tSession: {s} "
+               
     return email_body  
-      
-# def send_email(sender, recipient, subject, body):
-#     """Sends an email using the Linux mail command.
-#
-#     Args:
-#         sender (str): The sender's email address.
-#         recipient (str): The recipient's email address.
-#         subject (str): The email subject.
-#         body (str): The email body.
-#     """
-#
-#     # Create the mail command.
-#     command = "mail -s {subject} {recipient} < {body}".format(
-#         subject=subject,
-#         recipient=recipient,
-#         body=body
-#     )
-#
-#     # Run the mail command.
-#     os.system(command)
     
 def get_db_connection():
     
@@ -213,48 +206,20 @@ def rename_folders(root_path):
                                         if os.path.isdir(os.path.join(scans_folder, old_name)):
                                             os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
                                             print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
+                                            logger.debug(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
                                         else:
-                                            print(f"Could not find directory {os.path.join(scans_folder, old_name)}")
+                                            print(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
+                                            logger.debug(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
                             else:
                                 print(f"Could not find scan_metadata.csv in {metadata_folder}")
+                                logger.debug(f"Could not find scan_metadata.csv in {metadata_folder}")
                         else:
                             print(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
+                            logger.debug(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
                     else:
                         print(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
+                        logger.debug(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
         
-    # # Move YA content to YA/DICOM
-    # ya_folder = os.path.join(root_path, "YA")
-    # if os.path.isdir(ya_folder):
-    #     dicom_folder = os.path.join(ya_folder, "DICOM")
-    #     if not os.path.isdir(dicom_folder):
-    #         os.mkdir(dicom_folder)
-    #     for item in os.listdir(ya_folder):
-    #         if item != "DICOM":
-    #             src = os.path.join(ya_folder, item)
-    #             dst = os.path.join(dicom_folder, item)
-    #             os.rename(src, dst)
-    
-        # # Add BIDS folder to YA
-        # bids_folder = os.path.join(ya_folder, "BIDS")
-        # if not os.path.isdir(bids_folder):
-        #     os.mkdir(bids_folder)
-    
-    # # Move YT content to YT/DICOM
-    # yt_folder = os.path.join(root_path, "YT")
-    # if os.path.isdir(yt_folder):
-    #     dicom_folder = os.path.join(yt_folder, "DICOM")
-    #     if not os.path.isdir(dicom_folder):
-    #         os.mkdir(dicom_folder)
-    #     for item in os.listdir(yt_folder):
-    #         if item != "DICOM":
-    #             src = os.path.join(yt_folder, item)
-    #             dst = os.path.join(dicom_folder, item)
-    #             os.rename(src, dst)
-    
-        # # Add BIDS folder to YT
-        # bids_folder = os.path.join(yt_folder, "BIDS")
-        # if not os.path.isdir(bids_folder):
-        #     os.mkdir(bids_folder)
 
 def get_subject_group(host, auth, session_id):
     
@@ -270,11 +235,13 @@ def get_subject_group(host, auth, session_id):
             group_id=list_of_rows[0][2]
         else:
             print('The group is not set.')
+            logger.debug('The group is not set.')
             group_id=""
         # for record in list_of_rows:
         #     group_id=record[2]
     else:
         print(f"Failed to retrieve subject group. Status code: {response.status_code}")
+        logger.debug(f"Failed to retrieve subject group. Status code: {response.status_code}")
 
     return group_id
 
@@ -306,13 +273,12 @@ def create_metadata(auth, host, output_dir, level, session_id):
                 line=line.split(',')
                 line = [line[i] for i in neworder]
                 writer.writerow(line)
-        # print("Done.")
-        #rearrange_csv_columns(f'{meta_dir}/{level}_metadata_tmp.csv',f'{meta_dir}/{level}_metadata.csv')
     else:
         print(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
+        logger.debug(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
         
     
-def download_resources(host, auth, session_id, output_dir):
+def download_resources(host, auth, session_id, output_dir, session_label):
     resources_path=f"{host}/data/archive/experiments/{session_id}/resources?format=csv&columns=label"
     response = requests.get(resources_path, auth=auth)
     if response.status_code == 200:
@@ -323,6 +289,10 @@ def download_resources(host, auth, session_id, output_dir):
         # Remove the header
         list_of_rows.pop(0)
         print(list_of_rows)
+        if len(list_of_rows) == 0:
+            print('Associated resources not found.')
+            logger.debug('Associated resources not found.')
+            
         for row in list_of_rows:
             # If resource exists and files exist for that resource
             if row[1] and row[6]:
@@ -332,6 +302,13 @@ def download_resources(host, auth, session_id, output_dir):
                 response = requests.get(resource_url, auth=auth, stream=True)
 
                 resource_dir = os.path.join(output_dir,"resources")
+                
+                # If resource directory exists - remove it
+                if os.path.exists(resource_dir) and os.path.isdir(resource_dir):
+                    shutil.rmtree(resource_dir)
+                    
+                resource_dir = os.path.join(output_dir,"resources")
+                    
                 resource_type_dir = os.path.join(resource_dir, resource_type)
                 os.makedirs(resource_dir, exist_ok=True)
                 
@@ -362,27 +339,32 @@ def download_resources(host, auth, session_id, output_dir):
                 # Check if resource of this type is defined in the db, if not - create it
                 all_types = get_all_resource_types(connection)
                 print(f"Select result: {all_types}")
-                logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
+                #logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
                 
-                if resource_type not in all_types:
-                    add_new_resource_type(connection, resource_type)
+                if resource_type.lower() not in all_types[0]:
+                    add_new_resource_type(connection, resource_type.lower())
                                         
                 ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
-                res_count = get_resource_count_by_type(connection, session_id, resource_type)
+                res_count = get_resource_count_by_type(connection, session_id, resource_type.lower())
                 if int(res_count[0][0]) > 0:
                     result = update_resource_dw_date(connection, session_id)
                 else:    
-                    result = insert_new_resource(connection, session_id, resource_type)                
+                    result = insert_new_resource(connection, session_id, resource_type.lower())                
                     print(f"Insert result: {result}")                         
+                
+                dw_resources.append(session_label)
         # else:
         #     print('Associated resources not found.')
+        #     logger.debug('Associated resources not found.')
+                
     else:
         print(f"Failed to get resource info. Status code: {response.status_code}")
     
 def download_xnat_data(host, username, password, session_labels, overwrite, output_dir, project_id, res_overwrite):
     # Authenticate with XNAT using username and password
     auth = HTTPBasicAuth(username, password)
-
+    
+    dw_sessions=[]
     # Loop through each session label and download its data
     for session_label in session_labels:
         
@@ -418,38 +400,30 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         output_directory = os.path.join(output_dir, 'YA', 'DICOM', f'YA-{session_label}-{session_date}')   
                     else:
                         print(f"Invalid group: {group}. Session: {session_label}")
+                        logger.debug(f"Invalid group: {group}. Session: {session_label}")
                         continue
                      
-                     
+                    
+                    # The logic is as follows: if the session output directory exists - check if the resource folder exists. If not - download resources. 
                     if os.path.exists(output_directory):
-                        print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
-                        
-                        #TODO: Check if download resources override is set, then overwrite resources, don't re-download data
-                        if res_overwrite:
-                            download_resources(host, auth, session_id, output_directory)
+                        if os.path.exists(os.path.join(output_directory,"resources")):
+                            if res_overwrite:
+                                print(f'Directory {output_directory} already exists. Assuming data downloaded previously. Overwriting resources.')
+                                logger.debug(f'Directory {output_directory} already exists. Assuming data downloaded previously. Overwriting resources.')
+                                download_resources(host, auth, session_id, output_directory, session_label)
+                            else:    
+                                print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
+                                logger.debug(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
+                        else:
+                            print(f'Directory {output_directory} already exists. Downloading resources only.')
+                            logger.debug(f'Directory {output_directory} already exists. Downloading resources only.')
+                            download_resources(host, auth, session_id, output_directory, session_label)
                             
                         proceed=False
                     else:
                         os.makedirs(output_directory)                    
-
-                    # # Determine the output directory based on the session label
-                    # if session_label.startswith('7'):
-                    #     output_directory = os.path.join(output_dir, 'YT', f'YT-{session_label}-{session_date}')
-                    # elif session_label.startswith('4'):
-                    #     output_directory = os.path.join(output_dir, 'YA', f'YA-{session_label}-{session_date}')
-                    # else:
-                    #     print(f"Invalid session label: {session_label}")
-                    #     continue
-    
-                
-                    # # Create the output directory if it doesn't exist
-                    # try:
-                    #     os.makedirs(output_directory, exist_ok=False)
-                    # except:
-                    #     print(f'Directory {output_directory} already exists. Assuming data downloaded previously.')
-                    #     proceed=False                     
-                            
-                            
+             
+                                                        
                     # Add BIDS folder to YA/YT folder, if doesn't exist
                     if not os.path.exists(os.path.join(output_dir, group, 'BIDS')):
                         os.mkdir(os.path.join(output_dir, group, 'BIDS')) 
@@ -493,8 +467,10 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                             shutil.rmtree(os.path.join(output_directory,session_label))
                         except FileNotFoundError: 
                             print (f"File Not Found: {os.path.join(output_directory,session_label)}") 
+                            logger.debug(f"File Not Found: {os.path.join(output_directory,session_label)}")
                         except : 
                             print (f"Error deleting {os.path.join(output_directory,session_label)}")   
+                            logger.debug(f"Error deleting {os.path.join(output_directory,session_label)}")
                         
                         # Get metadata
                         #session_api_path = f'{host}/data/archive/projects/{project_id}/experiments?xsiType=xnat:mrSessionData&format=csv&columns=ID,label,xnat:subjectData/label'
@@ -503,7 +479,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         #create_metadata(auth, session_api_path, output_directory, "session", session_label)  
                                
                         create_metadata(auth, host, output_directory, "scan", session_id)
-                        download_resources(host, auth, session_id, output_directory)
+                        download_resources(host, auth, session_id, output_directory, session_label)
                         
                         connection = get_db_connection()
                         if is_study(connection, session_id):
@@ -516,11 +492,16 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         result = get_all_studies(connection) 
                         print(f"Select studies result: {result}")
                         
+                        dw_sessions.append(session_label)
                         print(f"Finished downloading {session_label}.\n")
+                        logger.debug(f"Finished downloading {session_label}.\n")
                         
-                        # rename_folders(output_dir)
+            if len(dw_sessions)>0:
+                dw_projects[project_id]=dw_sessions            
+            # rename_folders(output_dir)
         else:
             print(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")
+            logger.debug(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")
 
     rename_folders(output_dir)    
         
@@ -538,15 +519,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     
-    # # Need a working directory in user's home to store download information 
-    # home_directory = os.path.expanduser( '~' )
-    # output_directory = os.path.join( home_directory, 'xnat_download')
-    
-    
-    # # Create working directory. This directory will store information about downloaded data.
-    # if not os.path.isdir(output_directory):
-    #     os.makedirs(output_directory)
-    
     # Split the session labels into a list
     session_labels = args.session_labels.split(',')
 
@@ -556,5 +528,9 @@ if __name__ == '__main__':
 
     # Download the data
     download_xnat_data(args.fqdn, args.username, args.password, session_labels, args.overwrite, args.output_dir, args.project_id, args.res_overwrite)
-    #rename_folders(args.output_dir)
-
+    
+    if len(dw_projects)>0 or len(dw_resources)>0:
+        print(create_email(dw_projects,dw_resources))
+        logger.debug(create_email(dw_projects,dw_resources))
+        send_email(create_email(dw_projects,dw_resources))
+   

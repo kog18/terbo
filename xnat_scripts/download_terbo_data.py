@@ -85,7 +85,7 @@ def create_email(dw_projects,dw_resources):
         email_body+="The following data were downloaded from TERBO projects on NURIPS:\n"
         
         for project in dw_projects.keys():
-            email_body+=f"\n\tProject: "
+            email_body+=f"\n\tProject: {project}"
             for s in dw_projects[project]:
                 email_body+=f"\n\t\tSession: {s} "
     
@@ -141,10 +141,12 @@ def run_query(connection, query):
     else:
         results = 'No results returned'    
 
+    # Getting rid of tuples in the query result
+    final_result = [i[0] for i in results]
     # Close the cursor.
     cursor.close()
 
-    return results
+    return final_result
 
 def get_all_resource_types(connection):
     result = run_query(connection, "SELECT type FROM resource_types;") 
@@ -341,12 +343,12 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                 print(f"Select result: {all_types}")
                 #logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
                 
-                if resource_type.lower().strip() not in all_types[0]:
+                if resource_type.lower().strip() not in all_types:
                     add_new_resource_type(connection, resource_type.lower().strip())
                                         
                 ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
                 res_count = get_resource_count_by_type(connection, session_id, resource_type.lower())
-                if int(res_count[0][0]) > 0:
+                if int(res_count[0]) > 0:
                     result = update_resource_dw_date(connection, session_id)
                 else:    
                     result = insert_new_resource(connection, session_id, resource_type.lower())                

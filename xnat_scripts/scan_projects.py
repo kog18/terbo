@@ -10,6 +10,7 @@ import smtplib
 import re
 from datetime import datetime
 from email.message import EmailMessage
+from difflib import SequenceMatcher
 
 verbose = False
 
@@ -163,7 +164,27 @@ for p in project_list:
                     subject_errors=[f"missing behavioral data folder in session {sess_label}"]
                 
             for resource in resources:
-                r=resource.label()
+                r=resource.label().lower()
+                
+                # Checking for misspellings on "behavioral"
+                match_score=SequenceMatcher(None, r, 'behavioral').ratio()
+                if verbose:
+                    print(f"Match score: {match_score}")
+                    
+                if match_score <1 and match_score > .7:
+                    if len(subject_errors)>0 or subject_errors is not None:
+                        subject_errors.append([f"misspelled behavioral data folder name ('{r}') in session {sess_label}"])
+                    else:
+                        subject_errors=[f"misspelled behavioral data folder name ('{r}') in session {sess_label}"]
+                
+                # Checking for incorrect Resources structure. Data folder shouldn't be called "resources".        
+                match_score=SequenceMatcher(None, r, 'resources').ratio()        
+                if match_score == 1 or match_score > .7:
+                    if len(subject_errors)>0 or subject_errors is not None:
+                        subject_errors.append([f"'{r}' is not a valid data folder name in session {sess_label}. Bad resources structure."])
+                    else:
+                        subject_errors=[f"'{r}' is not a valid data folder name in session {sess_label}. Bad resources structure."]
+                                
                 if verbose:
                     print(f"\t\tresource len: {len(project.subject(s).experiment(session).resources().get())}")
                     print(f'\t\t\tResource type: {resource.label()}, # of files: {len(project.subject(s).experiment(session).resource(resource.id()).files().get())}')

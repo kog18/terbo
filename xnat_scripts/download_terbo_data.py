@@ -182,7 +182,7 @@ def get_all_studies(connection):
 
 def is_study(connection, session_id):
     result = run_query(connection, f"SELECT count(*) FROM studies where study_xnat_id = '{session_id}';")
-    if result[0][0] != 0:
+    if result[0] != 0:
         return True
     else:
         return False
@@ -204,7 +204,7 @@ def rename_folders(root_path):
                                     csv_reader = csv.DictReader(csv_file, skipinitialspace=True)
                                     for row in csv_reader:
                                         old_name = row["ID"].strip()
-                                        new_name = f"{row['ID'].strip()}_{row['type'].strip()}"
+                                        new_name = f"{row['ID'].strip()}_{row['type'].strip().replace('/','_')}"
                                         if os.path.isdir(os.path.join(scans_folder, old_name)):
                                             os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
                                             print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")

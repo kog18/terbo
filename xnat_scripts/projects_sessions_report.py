@@ -48,7 +48,7 @@ def create_email(errors_array,count_array):
         email_body+=f"Project: {project}: {count_array[project]} session{'' if count_array[project] == 1 else 's'}\n"
     
     
-    email_body+="\n\nThe following errors were found in TERBO projects on NURIPS:"    
+    email_body+="\n\nThe following is a summary of the TERBO projects on NURIPS:"    
     for key in errors_array.keys():
         project=key
         email_body+=f"\n\nProject: {project}\n"

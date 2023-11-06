@@ -354,7 +354,7 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                     result = insert_new_resource(connection, session_id, resource_type.lower())                
                     print(f"Insert result: {result}")                         
                 
-                dw_resources.append(session_label)
+                dw_resources.append(session_label+' - '+resource_type)
         # else:
         #     print('Associated resources not found.')
         #     logger.debug('Associated resources not found.')

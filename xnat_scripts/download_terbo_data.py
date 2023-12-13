@@ -187,42 +187,72 @@ def is_study(connection, session_id):
     else:
         return False
 
+# # Changing the downloaded file structure to combine scan ID with scan type for folder names and create DICOM and BIDS folders
+# def rename_folders(root_path):
+#     for folder1 in os.listdir(root_path):
+#         for folder2 in os.listdir(os.path.join(root_path, folder1)):
+#             if folder2 == 'DICOM':
+#                 dicom_folder = os.path.join(root_path, folder1, folder2)
+#                 for folder_session in os.listdir(dicom_folder):
+#                     scans_folder = os.path.join(root_path, folder1, folder2, folder_session, "SCANS")
+#                     if os.path.isdir(scans_folder):
+#                         metadata_folder = os.path.join(root_path, folder1, folder2, folder_session, "metadata")
+#                         if os.path.isdir(metadata_folder):
+#                             csv_path = os.path.join(metadata_folder, "scan_metadata.csv")
+#                             if os.path.isfile(csv_path):
+#                                 with open(csv_path) as csv_file:
+#                                     csv_reader = csv.DictReader(csv_file, skipinitialspace=True)
+#                                     for row in csv_reader:
+#                                         old_name = row["ID"].strip()
+#                                         new_name = row['ID'].strip()+'_'+row['type'].strip().replace('/','_').replace(' ','_').replace('\\','_')
+#                                         if os.path.isdir(os.path.join(scans_folder, old_name)):
+#                                             os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
+#                                             print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
+#                                             logger.debug(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
+#                                         else:
+#                                             print(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
+#                                             logger.debug(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
+#                             else:
+#                                 print(f"Could not find scan_metadata.csv in {metadata_folder}")
+#                                 logger.debug(f"Could not find scan_metadata.csv in {metadata_folder}")
+#                         else:
+#                             print(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
+#                             logger.debug(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
+#                     else:
+#                         print(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
+#                         logger.debug(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
+        
 # Changing the downloaded file structure to combine scan ID with scan type for folder names and create DICOM and BIDS folders
 def rename_folders(root_path):
-    for folder1 in os.listdir(root_path):
-        for folder2 in os.listdir(os.path.join(root_path, folder1)):
-            if folder2 == 'DICOM':
-                dicom_folder = os.path.join(root_path, folder1, folder2)
-                for folder_session in os.listdir(dicom_folder):
-                    scans_folder = os.path.join(root_path, folder1, folder2, folder_session, "SCANS")
-                    if os.path.isdir(scans_folder):
-                        metadata_folder = os.path.join(root_path, folder1, folder2, folder_session, "metadata")
-                        if os.path.isdir(metadata_folder):
-                            csv_path = os.path.join(metadata_folder, "scan_metadata.csv")
-                            if os.path.isfile(csv_path):
-                                with open(csv_path) as csv_file:
-                                    csv_reader = csv.DictReader(csv_file, skipinitialspace=True)
-                                    for row in csv_reader:
-                                        old_name = row["ID"].strip()
-                                        new_name = f"{row['ID'].strip()}_{row['type'].strip().replace('/','_')}"
-                                        if os.path.isdir(os.path.join(scans_folder, old_name)):
-                                            os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
-                                            print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
-                                            logger.debug(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
-                                        else:
-                                            print(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
-                                            logger.debug(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
-                            else:
-                                print(f"Could not find scan_metadata.csv in {metadata_folder}")
-                                logger.debug(f"Could not find scan_metadata.csv in {metadata_folder}")
-                        else:
-                            print(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
-                            logger.debug(f"Could not find metadata folder in {os.path.join(root_path, folder1, folder_session)}")
-                    else:
-                        print(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
-                        logger.debug(f"Could not find SCANS folder in {os.path.join(root_path, folder1, folder_session)}")
-        
 
+    scans_folder = os.path.join(root_path, "SCANS")
+    if os.path.isdir(scans_folder):
+        metadata_folder = os.path.join(root_path, "metadata")
+        if os.path.isdir(metadata_folder):
+            csv_path = os.path.join(metadata_folder, "scan_metadata.csv")
+            if os.path.isfile(csv_path):
+                with open(csv_path) as csv_file:
+                    csv_reader = csv.DictReader(csv_file, skipinitialspace=True)
+                    for row in csv_reader:
+                        old_name = row["ID"].strip()
+                        new_name = row['ID'].strip()+'_'+row['type'].strip().replace('/','_').replace(' ','_').replace('\\','_')
+                        if os.path.isdir(os.path.join(scans_folder, old_name)):
+                            os.rename(os.path.join(scans_folder, old_name), os.path.join(scans_folder, new_name))
+                            print(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
+                            logger.debug(f"Renamed {os.path.join(scans_folder, old_name)} to {os.path.join(scans_folder, new_name)}")
+                        else:
+                            print(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
+                            logger.debug(f"Could not find directory {os.path.join(scans_folder, old_name)}. Assuming already renamed.")
+            else:
+                print(f"Could not find scan_metadata.csv in {metadata_folder}")
+                logger.debug(f"Could not find scan_metadata.csv in {metadata_folder}")
+        else:
+            print(f"Could not find metadata folder in {os.path.join(root_path, 'metadata')}")
+            logger.debug(f"Could not find metadata folder in {os.path.join(root_path, 'metadata')}")
+    else:
+        print(f"Could not find SCANS folder in {os.path.join(root_path, 'SCANS')}")
+        logger.debug(f"Could not find SCANS folder in {os.path.join(root_path, 'SCANS')}")
+                        
 def get_subject_group(host, auth, session_id):
     
     get_group_path=f"{host}/data/archive/experiments?format=csv&xnat:mrSessionData/ID={session_id}&columns=xnat:subjectData/group"
@@ -464,7 +494,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         except:
                             print(f"Error moving {os.path.join(output_directory,session_label,'SCANS')} to {output_directory}")
                             logger.debug(f"Error moving {os.path.join(output_directory,session_label,'SCANS')} to {output_directory}")  
-                              
+                               
                         try:
                             shutil.rmtree(os.path.join(output_directory,session_label))
                         except FileNotFoundError: 
@@ -482,6 +512,8 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                                
                         create_metadata(auth, host, output_directory, "scan", session_id)
                         download_resources(host, auth, session_id, output_directory, session_label)
+                        
+                        rename_folders(output_directory)
                         
                         connection = get_db_connection()
                         if is_study(connection, session_id):
@@ -505,7 +537,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
             print(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")
             logger.debug(f"Failed to retrieve scan data for session {session_label}. Status code: {response.status_code}")
 
-    rename_folders(output_dir)    
+    #rename_folders(output_dir)    
         
 if __name__ == '__main__':
     # Parse command line arguments

@@ -281,7 +281,7 @@ def get_subject_group(host, auth, session_id):
                        
 def create_metadata(auth, host, output_dir, level, session_id):
     
-    api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note'
+    api_path = f'{host}/data/archive/experiments/{session_id}/scans?format=csv&columns=xnat:mrSessionData/project,xnat:mrSessionData/label,quality,ID,type,note,xnat:mrSessionData/note'
     print(f'{api_path}')
     # Get session list
     url = api_path
@@ -297,7 +297,7 @@ def create_metadata(auth, host, output_dir, level, session_id):
         meta_dir = os.path.join(output_dir,"metadata")
         os.makedirs(meta_dir, exist_ok=True)
         
-        neworder=[0,2,3,5,6,7,1,4]
+        neworder=[0,2,3,5,6,8,1,4]
         # write out the csv file, change order according to the new order index
         with open(f'{meta_dir}/{level}_metadata.csv', "w", newline='') as csvFile:
             writer = csv.writer(csvFile)
@@ -305,6 +305,12 @@ def create_metadata(auth, host, output_dir, level, session_id):
                 line=line.split(',')
                 line = [line[i] for i in neworder]
                 writer.writerow(line)
+        
+        # Check if there is a session-level note. If yes, save it in a session metadata file
+        sess_record = decoded_content.splitlines()[1].split('"')
+        if len(decoded_content.splitlines()[1].split('"')) > 1:
+            with open(f'{meta_dir}/session_metadata.txt', "w", newline='') as txtFile:
+                txtFile.write(sess_record[1])        
     else:
         print(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
         logger.debug(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")

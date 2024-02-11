@@ -331,10 +331,14 @@ def download_resources(host, auth, session_id, output_dir, session_label):
             print('Associated resources not found.')
             logger.debug('Associated resources not found.')
 
+        
         resource_dir = os.path.join(output_dir,"resources")
+
         # If resource directory exists - remove it
         if os.path.exists(resource_dir) and os.path.isdir(resource_dir):
             shutil.rmtree(resource_dir)
+        
+        os.makedirs(resource_dir, exist_ok=True)
             
         for row in list_of_rows:
             # If resource exists and files exist for that resource
@@ -345,10 +349,11 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                 response = requests.get(resource_url, auth=auth, stream=True)
                     
                 resource_type_dir = os.path.join(resource_dir, resource_type)
-                os.makedirs(resource_dir, exist_ok=True)
                 
                 #TODO: Overwrite logic
                 os.makedirs(resource_type_dir, exist_ok=True)
+                print(f'Created directory {resource_type_dir}')
+                logger.debug(f'Created directory {resource_type_dir}')
                     
                 # Save the resource data to a file
                 output_filename = f"{session_id}_{resource_type}.zip"
@@ -357,8 +362,8 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                     for chunk in response.iter_content(chunk_size=1024):
                         f.write(chunk)
                 
-                print ("Resource download completed. Extracting...")
-                logger.debug("Resource download completed. Extracting...")
+                print (f"Resource {resource_type} download completed. Extracting...")
+                logger.debug(f"Resource {resource_type} download completed. Extracting...")
                 
                 # Extract data without the directory structure (files only), remove the zip file
                 with zipfile.ZipFile(output_path) as file:

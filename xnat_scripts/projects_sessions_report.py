@@ -24,6 +24,7 @@ def send_email(body):
     msg['Subject'] = "TERBO report for Lei Wang"
     msg['From'] = 'TERBO QC <alexandr.kogan@osumc.edu>'
     msg['To'] = 'Lei Wang <wang.14640@osu.edu>'
+    msg['Cc'] = 'Subhashini Madhavan <subhashini.madhavan@osumc.edu>'
     msg['Bcc'] = 'Alex Kogan <kogan.33@osu.edu>'
     msg.set_content(body)
     

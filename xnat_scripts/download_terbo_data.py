@@ -330,6 +330,11 @@ def download_resources(host, auth, session_id, output_dir, session_label):
         if len(list_of_rows) == 0:
             print('Associated resources not found.')
             logger.debug('Associated resources not found.')
+
+        resource_dir = os.path.join(output_dir,"resources")
+        # If resource directory exists - remove it
+        if os.path.exists(resource_dir) and os.path.isdir(resource_dir):
+            shutil.rmtree(resource_dir)
             
         for row in list_of_rows:
             # If resource exists and files exist for that resource
@@ -338,14 +343,6 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                 resource_url = f"{host}/data/archive/experiments/{session_id}/resources/{resource_type}/files?format=zip&structure=legacy"
                 #print(scan_url)
                 response = requests.get(resource_url, auth=auth, stream=True)
-
-                resource_dir = os.path.join(output_dir,"resources")
-                
-                # If resource directory exists - remove it
-                if os.path.exists(resource_dir) and os.path.isdir(resource_dir):
-                    shutil.rmtree(resource_dir)
-                    
-                resource_dir = os.path.join(output_dir,"resources")
                     
                 resource_type_dir = os.path.join(resource_dir, resource_type)
                 os.makedirs(resource_dir, exist_ok=True)

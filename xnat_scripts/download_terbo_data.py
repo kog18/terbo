@@ -277,6 +277,45 @@ def get_subject_group(host, auth, session_id):
 
     return group_id
 
+def find_seventh_comma_index(text):
+
+    # Strip leading/trailing commas and split by commas
+    text_list = text.strip(",").split(",")
+
+    # Check if there are at least 7 commas
+    if len(text_list) >= 7:
+        # Return the index of the 7th element (6th index due to 0-based indexing)
+        return text.find(text_list[7])  # Use comma-separated list element to find it in original string
+    else:
+        # Return -1 if there are not enough commas
+        return -1
+    
+def extract_session_note(text):
+
+    try:
+        # Find the index of the 7th comma
+        seventh_comma_index = find_seventh_comma_index(text)
+    
+        # Extract the relevant portion of the string
+        if seventh_comma_index != -1:
+            relevant_portion = text[seventh_comma_index:]  # Include text after the 7th comma
+    
+            # Find the first comma followed by forward slash
+            slash_index = relevant_portion.find(",/")
+    
+            if slash_index != -1:
+                # Extract the text before the comma/slash
+                return relevant_portion[:slash_index].strip(",")  # Remove leading/trailing commas
+            else:
+                # Handle case where forward slash is not found
+                return relevant_portion.strip(",")  # Remove leading/trailing commas
+        else:
+            return ""  # Not enough commas
+    
+    except ValueError:
+        # Handle potential errors during string processing
+        print("Error: Invalid string format.")
+        return ""
 
                        
 def create_metadata(auth, host, output_dir, level, session_id):
@@ -307,10 +346,12 @@ def create_metadata(auth, host, output_dir, level, session_id):
                 writer.writerow(line)
         
         # Check if there is a session-level note. If yes, save it in a session metadata file
-        sess_record = decoded_content.splitlines()[1].split('"')
-        if len(decoded_content.splitlines()[1].split('"')) > 1:
+        #sess_record = decoded_content.splitlines()[1].split('"')
+        sess_record = extract_session_note(decoded_content.splitlines()[1])
+        print(f'Session level note: {sess_record}')
+        if len(sess_record) > 1:
             with open(f'{meta_dir}/session_metadata.txt', "w", newline='') as txtFile:
-                txtFile.write(sess_record[1])        
+                txtFile.write(sess_record)        
     else:
         print(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")
         logger.debug(f"Failed to retrieve the {level} metadata. Status code: {response.status_code}")

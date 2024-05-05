@@ -415,23 +415,24 @@ def download_resources(host, auth, session_id, output_dir, session_label):
                 # Remove the zip file
                 os.remove(output_path)       
                 
-                connection = get_db_connection()
-                
-                # Check if resource of this type is defined in the db, if not - create it
-                all_types = get_all_resource_types(connection)
-                print(f"Select result: {all_types}")
-                #logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
-                
-                if resource_type.lower().strip() not in all_types:
-                    add_new_resource_type(connection, resource_type.lower().strip())
-                                        
-                ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
-                res_count = get_resource_count_by_type(connection, session_id, resource_type.lower())
-                if int(res_count[0]) > 0:
-                    result = update_resource_dw_date(connection, session_id)
-                else:    
-                    result = insert_new_resource(connection, session_id, resource_type.lower())                
-                    print(f"Insert result: {result}")                         
+                ##  Remove all db calls to run on the login nodes
+                # connection = get_db_connection()
+                #
+                # # Check if resource of this type is defined in the db, if not - create it
+                # all_types = get_all_resource_types(connection)
+                # print(f"Select result: {all_types}")
+                # #logger.debug(f"All types: {all_types}, Resource type: {resource_type}")
+                #
+                # if resource_type.lower().strip() not in all_types:
+                #     add_new_resource_type(connection, resource_type.lower().strip())
+                #
+                # ## Check if the resource of this type for this session was already downloaded and insert resource info into the db, using the type_code, if needed
+                # res_count = get_resource_count_by_type(connection, session_id, resource_type.lower())
+                # if int(res_count[0]) > 0:
+                #     result = update_resource_dw_date(connection, session_id)
+                # else:    
+                #     result = insert_new_resource(connection, session_id, resource_type.lower())                
+                #     print(f"Insert result: {result}")                         
                 
                 dw_resources.append(session_label+' - '+resource_type)
         # else:
@@ -446,6 +447,11 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
     auth = HTTPBasicAuth(username, password)
     
     dw_sessions=[]
+    
+    if session_labels == "all":
+        # TODO: Get all session labels for current project and assign to session_labels
+        pass
+    
     # Loop through each session label and download its data
     for session_label in session_labels:
         
@@ -564,16 +570,17 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                         
                         rename_folders(output_directory)
                         
-                        connection = get_db_connection()
-                        if is_study(connection, session_id):
-                            result = update_study_dw_date(connection, session_id)
-                        else:
-                            result = insert_new_study(connection, session_label, session_id, project_id)
-                            
-                        print(f"Insert study result: {result}")
-                        
-                        result = get_all_studies(connection) 
-                        print(f"Select studies result: {result}")
+                        ##  Remove all db calls to run on the login nodes
+                        # connection = get_db_connection()
+                        # if is_study(connection, session_id):
+                        #     result = update_study_dw_date(connection, session_id)
+                        # else:
+                        #     result = insert_new_study(connection, session_label, session_id, project_id)
+                        #
+                        # print(f"Insert study result: {result}")
+                        #
+                        # result = get_all_studies(connection) 
+                        # print(f"Select studies result: {result}")
                         
                         dw_sessions.append(session_label)
                         print(f"Finished downloading {session_label}.\n")
@@ -608,6 +615,9 @@ if __name__ == '__main__':
     # If password argument is not provided, prompt the user for the password
     if not args.password:
         args.password = getpass.getpass(prompt='XNAT password: ')
+
+    if not args.session_labels:
+        args.session_labels = "all"
 
     # Download the data
     download_xnat_data(args.fqdn, args.username, args.password, session_labels, args.overwrite, args.output_dir, args.project_id, args.res_overwrite)

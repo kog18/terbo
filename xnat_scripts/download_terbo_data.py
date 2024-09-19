@@ -456,7 +456,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
     for session_label in session_labels:
         
         xnat_url = f"{host}/data/archive/projects/{project_id}/experiments?xsiType=xnat:mrSessionData&format=csv&columns=ID,label,date,xnat:subjectData/label"
-        #print(xnat_url)
+        logger.debug(xnat_url)
         # Make a GET request to retrieve the scan data for the session
         response = requests.get(xnat_url, auth=auth)
         
@@ -471,6 +471,7 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
                                    
             # Loop through each list of sessions
             for record in list_of_rows:
+                logger.debug(record)
                 proceed=True
                 session_label_xnat = record[4]
                 

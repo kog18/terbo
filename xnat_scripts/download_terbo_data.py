@@ -466,13 +466,15 @@ def download_xnat_data(host, username, password, session_labels, overwrite, outp
             decoded_content = response.content.decode('utf-8')
             csv_reader = csv.reader(decoded_content.splitlines(), delimiter=',')
             list_of_rows = list(csv_reader)
-            logger.debug("List of rows: " + list_of_rows)
+            logger.debug("List of rows: \n")
+            logger.debug(list_of_rows)
             #json_data = json.dumps(list_of_rows) 
             list_of_rows.pop(0)
                                    
             # Loop through each list of sessions
             for record in list_of_rows:
-                logger.debug("Record: " + record)
+                logger.debug("Record: \n")
+                logger.debug(record)
                 proceed=True
                 session_label_xnat = record[4]
                 

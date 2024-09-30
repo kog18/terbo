@@ -11,16 +11,23 @@ import re
 from datetime import datetime
 from email.message import EmailMessage
 from difflib import SequenceMatcher
+import configparser
+import pathlib
 
-verbose = False
+verbose = True
 
 def send_email(body):
+    
+    config = configparser.ConfigParser()
+    db_config_path = pathlib.Path(__file__).parent.absolute() / "config.ini"
+    db_file_name = config.read(db_config_path)
+    
     # Create the base text message.
     msg = EmailMessage()
-    msg['Subject'] = "TERBO QC report"
-    msg['From'] = 'TERBO QC <alexandr.kogan@osumc.edu>'
-    msg['To'] = 'TERBO Imaging <terbo.imaging.ra@fstrf.org>'
-    msg['Bcc'] = 'Alex Kogan <kogan.33@osu.edu>'
+    msg['Subject'] = config["qc mail"]["subject"]
+    msg['From'] = config["qc mail"]["from"]
+    msg['To'] = config["qc mail"]["to"]
+    msg['Bcc'] = config["qc mail"]["bcc"]
     msg.set_content(body)
     
     current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")

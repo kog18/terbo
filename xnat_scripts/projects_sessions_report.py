@@ -10,6 +10,8 @@ import smtplib
 import re
 from datetime import datetime
 from email.message import EmailMessage
+import configparser
+import pathlib
 
 # for key, val in sorted(os.environ.items()):
 #     print(key)
@@ -19,13 +21,18 @@ from email.message import EmailMessage
 verbose = False
 
 def send_email(body):
+    
+    config = configparser.ConfigParser()
+    db_config_path = pathlib.Path(__file__).parent.absolute() / "config.ini"
+    db_file_name = config.read(db_config_path)
+    
     # Create the base text message.
     msg = EmailMessage()
-    msg['Subject'] = "TERBO report for Lei Wang"
-    msg['From'] = 'TERBO QC <alexandr.kogan@osumc.edu>'
-    msg['To'] = 'Lei Wang <wang.14640@osu.edu>'
-    msg['Cc'] = 'Subhashini Madhavan <subhashini.madhavan@osumc.edu>'
-    msg['Bcc'] = 'Alex Kogan <kogan.33@osu.edu>'
+    msg['Subject'] = config["qc lei mail"]["subject"]
+    msg['From'] = config["qc lei mail"]["from"]
+    msg['To'] = config["qc lei mail"]["to"]
+    msg['Cc'] = config["qc lei mail"]["cc"]
+    msg['Bcc'] = config["qc lei mail"]["bcc"]
     msg.set_content(body)
     
     current_datetime = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")

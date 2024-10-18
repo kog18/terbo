@@ -345,10 +345,12 @@ def create_metadata(auth, host, output_dir, level, session_id):
                 line = [line[i] for i in neworder]
                 writer.writerow(line)
         
+        logger.debug(f'Decoded content: {decoded_content.splitlines()}')
         # Check if there is a session-level note. If yes, save it in a session metadata file
         #sess_record = decoded_content.splitlines()[1].split('"')
         sess_record = extract_session_note(decoded_content.splitlines()[1])
         print(f'Session level note: {sess_record}')
+        logger.debug(f'Session level note: {sess_record}')
         if len(sess_record) > 1:
             with open(f'{meta_dir}/session_metadata.txt', "w", newline='') as txtFile:
                 txtFile.write(sess_record)        
